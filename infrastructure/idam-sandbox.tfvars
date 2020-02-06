@@ -2,6 +2,7 @@ idam_api_url_override = "http://idam-api-idam-sandbox.service.core-compute-idam-
 ssl_verification_enabled = "false"
 https_only = "false"
 
+vault_name_override = "idam-idam-preview"
 asp_name_override = "idam-idam-sandbox"
 asp_rg_override = "idam-idam-sandbox"
 
