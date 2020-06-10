@@ -4,9 +4,13 @@ properties([
     pipelineTriggers([cron('10 21 * * *')]),
 
     parameters([
-
+        string(name: 'ENVIRONMENT', defaultValue: 'aat', description: 'Environment to test'),
         string(name: 'URL_TO_TEST', defaultValue: 'https://idam-web-public.aat.platform.hmcts.net', description: 'The URL you want to run these tests against'),
         string(name: 'API_URL_TO_TEST', defaultValue: 'https://idam-api.aat.platform.hmcts.net', description: 'The API URL you want to run these tests against '),
+        booleanParam(name: 'skipSecurityScanTests', defaultValue: false, description: 'Runs on aat envt only'),
+        booleanParam(name: 'skipMutationTests', defaultValue: false, description: ''),
+        booleanParam(name: 'skipFullFunctionalTests', defaultValue: false, description: ''),
+        booleanParam(name: 'skipCrossBrowserTests', defaultValue: false, description: ''),
     ])
 ])
 
@@ -19,7 +23,7 @@ def product = "idam"
 def component = "web-public"
 
 def secrets = [
-    'idam-idam-aat': [
+    "idam-idam-${params.ENVIRONMENT}": [
         secret('smoke-test-user-username', 'SMOKE_TEST_USER_USERNAME'),
         secret('smoke-test-user-password', 'SMOKE_TEST_USER_PASSWORD'),
         secret('notify-api-key', 'NOTIFY_API_KEY')
@@ -27,10 +31,10 @@ def secrets = [
 ]
 
 static LinkedHashMap<String, Object> secret(String secretName, String envVar) {
-    [$class : 'AzureKeyVaultSecret',
+    [$class     : 'AzureKeyVaultSecret',
      secretType : 'Secret',
-     name : secretName,
-     version : '',
+     name       : secretName,
+     version    : '',
      envVariable: envVar
     ]
 }
@@ -38,33 +42,44 @@ static LinkedHashMap<String, Object> secret(String secretName, String envVar) {
 withNightlyPipeline(type, product, component) {
     env.TEST_URL = params.URL_TO_TEST
     env.IDAMAPI = params.API_URL_TO_TEST
-    loadVaultSecrets(secrets)
-    enableSecurityScan()
-    enableMutationTest()
-    enableFullFunctionalTest(200)
-    enableCrossBrowserTest()
 
-    after('crossBrowserTest') {
-        try {
-            withSauceConnect("reform_tunnel") {
-                sh "./gradlew functionalSauce"
-                steps.archiveArtifacts allowEmptyArchive: true, artifacts: 'functional-output/**/*'
+    loadVaultSecrets(secrets)
+
+    if (params.ENVIRONMENT == 'aat' && !params.skipSecurityScanTests) {
+        enableSecurityScan()
+    }
+
+    if (!params.skipMutationTests) {
+        enableMutationTest()
+    }
+
+    if (!params.skipCrossBrowserTests) {
+        enableCrossBrowserTest()
+        after('crossBrowserTest') {
+            try {
+                withSauceConnect("reform_tunnel") {
+                    sh "./gradlew functionalSauce"
+                    steps.archiveArtifacts allowEmptyArchive: true, artifacts: 'functional-output/**/*'
+                }
+            }
+            finally {
+                steps.saucePublisher()
             }
         }
-        finally {
-            steps.saucePublisher()
+    }
+
+    if (!params.skipFullFunctionalTests) {
+        enableFullFunctionalTest(200)
+        after('fullFunctionalTest') {
+            publishHTML target: [
+                allowMissing         : true,
+                alwaysLinkToLastBuild: true,
+                keepAll              : true,
+                reportDir            : "output",
+                reportFiles          : "idam-web-public-e2e-result.html",
+                reportName           : "IDAM Web Public E2E functional tests result"
+            ]
         }
     }
 
-    after('fullFunctionalTest') {
-
-        publishHTML target: [
-            allowMissing : true,
-            alwaysLinkToLastBuild: true,
-            keepAll : true,
-            reportDir : "output",
-            reportFiles : "idam-web-public-e2e-result.html",
-            reportName : "IDAM Web Public E2E functional tests result"
-        ]
-    }
 }
