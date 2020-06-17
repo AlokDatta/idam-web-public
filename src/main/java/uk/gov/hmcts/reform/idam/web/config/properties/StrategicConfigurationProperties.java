@@ -4,6 +4,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import lombok.Data;
 
+import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 @ConfigurationProperties(prefix = "strategic")
@@ -14,6 +16,7 @@ public class StrategicConfigurationProperties {
     private EndpointConfigurationProperties endpoint;
     private Policies policies;
     private Session session;
+    private Language language;
 
     @Data
     public static class ServiceConfigurationProperties {
@@ -53,6 +56,11 @@ public class StrategicConfigurationProperties {
     @Data
     public static class Session {
         private String idamSessionCookie;
-        private String affinityCookie;
+        private List<String> affinityCookies;
+    }
+
+    @Data
+    public static class Language {
+        private Set<String> supportedLocales;
     }
 }
