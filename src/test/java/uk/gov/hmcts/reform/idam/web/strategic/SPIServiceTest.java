@@ -2,6 +2,7 @@ package uk.gov.hmcts.reform.idam.web.strategic;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
+import com.netflix.zuul.constants.ZuulHeaders;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Before;
@@ -39,14 +40,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.google.common.net.HttpHeaders.X_FORWARDED_FOR;
-import static java.util.Collections.singletonList;
 import static junit.framework.TestCase.assertTrue;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -672,5 +670,56 @@ public class SPIServiceTest {
             .willReturn(ResponseEntity.ok().build());
         ApiAuthResult result = spiService.authenticate(USER_NAME, PASSWORD_ONE, REDIRECT_URI, USER_IP_ADDRESS);
         assertTrue(result.getCookies().isEmpty());
+    }
+
+    @Test
+    public void submitOtpeAuthentication_shouldReturnASetCookieHeaderIfSuccessful() {
+        final MultiValueMap<String, String> form = new LinkedMultiValueMap<>(2);
+        form.add("service", "otpe");
+        form.add("authId", "authIdSample");
+        form.add("otp", "otpSample");
+
+        final HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.add(ZuulHeaders.X_FORWARDED_FOR, "ipAddressSample");
+
+        MultiValueMap<String, String> resHeaders = new LinkedMultiValueMap<String, String>();
+        resHeaders.add(HttpHeaders.SET_COOKIE, "setCookieMock");
+
+        given(restTemplate.exchange(eq(API_URL + SLASH + AUTHENTICATE_ENDPOINT),
+            eq(HttpMethod.POST),
+            eq(new HttpEntity<>(form, headers)),
+            eq(Void.class)))
+            .willReturn(new ResponseEntity<Void>(resHeaders, HttpStatus.OK));
+
+        final List<String> response = spiService
+            .submitOtpeAuthentication("authIdSample", "ipAddressSample", "otpSample");
+
+        assertThat(response, CoreMatchers.hasItem("setCookieMock"));
+    }
+
+    @Test
+    public void submitOtpeAuthentication_shouldReturnNullIfNoCookieIsFound() {
+        final MultiValueMap<String, String> form = new LinkedMultiValueMap<>(2);
+        form.add("service", "otpe");
+        form.add("authId", "authIdSample");
+        form.add("otp", "otpSample");
+
+        final HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.add(ZuulHeaders.X_FORWARDED_FOR, "ipAddressSample");
+
+        MultiValueMap<String, String> resHeaders = new LinkedMultiValueMap<String, String>();
+
+        given(restTemplate.exchange(eq(API_URL + SLASH + AUTHENTICATE_ENDPOINT),
+            eq(HttpMethod.POST),
+            eq(new HttpEntity<>(form, headers)),
+            eq(Void.class)))
+            .willReturn(new ResponseEntity<Void>(resHeaders, HttpStatus.OK));
+
+        final List<String> response = spiService
+            .submitOtpeAuthentication("authIdSample", "ipAddressSample", "otpSample");
+
+        assertThat(response, CoreMatchers.nullValue());
     }
 }

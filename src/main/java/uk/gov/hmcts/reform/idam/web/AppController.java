@@ -224,6 +224,7 @@ public class AppController {
      * @should redirect to reset password page if token is valid
      * @should redirect to token expired page if token is invalid
      * @should redirect to token expired page if token is expired
+     * @should return blank forgotPasswordLink if blank 404
      */
     @PostMapping(value = "/passwordReset")
     public String passwordReset(@RequestParam("token") String token, @RequestParam("code") String code, Model model) {
